@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "cinco.batteries",
+  "name": "Batteries",
+  "version": "1.0.0",
+  "author": "euzebio",
+  "description": "Every battery on the bar. A drop-in replacement for the built-in power widget, for laptops that carry more than one pack.",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "Panel.qml"
+  },
+  "barWidget": {
+    "displayName": "Batteries",
+    "description": "Per-pack level, size, cycles, health and charge limit, plus the power profile picker",
+    "category": "System",
+    "defaultSection": "right",
+    "allowMultiple": false
+  },
+  "omarchy": {
+    "clonedFrom": "omarchy.power"
+  }
+}

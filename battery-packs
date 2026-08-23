@@ -1,0 +1,46 @@
+#!/bin/bash
+
+# Emits one TSV row per present battery:
+#   name <TAB> cycles <TAB> design_wh <TAB> full_wh <TAB> start_thresh <TAB> end_thresh
+#
+# These are the per-pack values Quickshell's UPower API does not expose. Live
+# values (percentage, state, rate, time) come from UPower directly, so this only
+# has to cover the slow-changing metadata.
+#
+# Missing fields are emitted as "-" so the column count stays fixed.
+
+power_supply_path="${OMARCHY_POWER_SUPPLY_PATH:-/sys/class/power_supply}"
+
+read_or_dash() {
+  [[ -r $1 ]] && cat "$1" 2>/dev/null || echo "-"
+}
+
+for battery in "$power_supply_path"/*; do
+  [[ -r $battery/type ]] || continue
+  [[ $(<"$battery/type") == "Battery" ]] || continue
+  [[ -r $battery/present && $(<"$battery/present") == "1" ]] || continue
+
+  name=${battery##*/}
+
+  cycles=$(read_or_dash "$battery/cycle_count")
+  # A pack that never reports cycles reads 0; that is "unknown", not "brand new".
+  [[ $cycles == "0" ]] && cycles="-"
+
+  design="-"
+  full="-"
+  if [[ -r $battery/energy_full_design && -r $battery/energy_full ]]; then
+    design=$(awk -v v="$(<"$battery/energy_full_design")" 'BEGIN { printf "%.2f", v / 1000000 }')
+    full=$(awk -v v="$(<"$battery/energy_full")" 'BEGIN { printf "%.2f", v / 1000000 }')
+  elif [[ -r $battery/charge_full_design && -r $battery/charge_full && -r $battery/voltage_min_design ]]; then
+    # Packs that report charge (µAh) instead of energy (µWh) need the design
+    # voltage to reach watt-hours.
+    millivolts=$(<"$battery/voltage_min_design")
+    design=$(awk -v v="$(<"$battery/charge_full_design")" -v mv="$millivolts" 'BEGIN { printf "%.2f", v * mv / 1000000000000 }')
+    full=$(awk -v v="$(<"$battery/charge_full")" -v mv="$millivolts" 'BEGIN { printf "%.2f", v * mv / 1000000000000 }')
+  fi
+
+  start=$(read_or_dash "$battery/charge_control_start_threshold")
+  stop=$(read_or_dash "$battery/charge_control_end_threshold")
+
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$cycles" "$design" "$full" "$start" "$stop"
+done
