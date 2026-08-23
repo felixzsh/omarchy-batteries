@@ -55,15 +55,16 @@ tool, or the firmware — without shelling out to `tlp-stat`.
 
 ```bash
 omarchy plugin add https://github.com/cinco/omarchy-batteries.git --enable
-omarchy plugin disable omarchy.power
 omarchy restart shell
 ```
 
-`omarchy plugin disable omarchy.power` matters: this is a replacement, not a
-companion. Leaving both enabled puts two battery widgets on the bar and makes
-them fight over the `omarchy.power` IPC target.
+That is the whole install. The manifest declares
+`omarchy.clonedFrom: "omarchy.power"`, so enabling this plugin takes the
+built-in widget's slot in the bar and disables it — no manual swap, and any
+`showPercentage` you had set carries over. The two are mutually exclusive by
+design; you cannot end up with both on the bar by following this.
 
-To place it explicitly:
+To place it somewhere else:
 
 ```bash
 omarchy bar move cinco.batteries --section right
@@ -83,9 +84,9 @@ The bar entry in `~/.config/omarchy/shell.json`:
 
 ## Compatibility with the built-in widget
 
-The manifest declares `omarchy.clonedFrom: "omarchy.power"`, so Omarchy's
-`resolveEnabledId` routes calls aimed at the built-in widget here. Everything
-that addressed the power panel keeps working:
+The same `clonedFrom` declaration makes Omarchy's `resolveEnabledId` route
+calls aimed at the built-in widget here. Everything that addressed the power
+panel keeps working:
 
 - `SUPER + CTRL + P` — `omarchy-shell shell toggle omarchy.power`
 - The menu's Battery Percentage item — `omarchy-shell omarchy.power togglePercentage`
@@ -101,9 +102,11 @@ omarchy-shell cinco.batteries togglePercentage
 
 ```bash
 omarchy plugin remove cinco.batteries
-omarchy plugin enable omarchy.power
 omarchy restart shell
 ```
+
+Removal restores `omarchy.power` to its slot on its own, for the same reason
+installing displaced it.
 
 ## Notes
 

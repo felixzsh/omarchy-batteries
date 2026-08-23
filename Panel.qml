@@ -354,9 +354,9 @@ Panel {
 
   // Compatibility handler. Omarchy's own menu entry and any user script still
   // address the power panel as "omarchy.power"; answering to it keeps those
-  // working after this plugin takes the built-in widget's place. A target
-  // accepts one handler, so this collides if omarchy.power is left enabled —
-  // disable it, which is what installing a replacement means anyway.
+  // working after this plugin takes the built-in widget's place. Claiming the
+  // target is safe because clonedFrom makes the two mutually exclusive: the
+  // built-in is disabled whenever this plugin is enabled.
   IpcHandler {
     target: "omarchy.power"
 
