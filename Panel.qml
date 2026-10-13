@@ -24,10 +24,22 @@ Panel {
   property int profileIndex: 0
   property bool cursorActive: false
   readonly property bool showPercentage: setting("showPercentage", false) === true
-  // With the percentage shown the button paints a text block wider than an
-  // icon, so the open-panel mark takes the painted width instead of the
-  // icon-sized fraction of the slot the fallback assumes.
-  readonly property real openPanelIndicatorWidth: (showPercentage || multiBattery) && !button.vertical ? button.glyphPaintedWidth : 0
+  readonly property bool vertical: bar ? bar.vertical === true : false
+  // BarIconButton fits one glyph to the icon size and paints labelText beside
+  // it; the open-panel mark takes the width of what the row actually paints
+  // instead of the icon-sized fraction of the slot the fallback assumes.
+  readonly property real openPanelIndicatorWidth: {
+    if (vertical) return 0
+    var total = 0
+    var children = buttonRow.children
+    for (var i = 0; i < children.length; i++) {
+      var child = children[i]
+      if (!child || child.visible === false) continue
+      total += child.glyphPaintedWidth || 0
+      if (child.labelWidth > 0) total += child.labelWidth + Style.space(4)
+    }
+    return total
+  }
   readonly property bool batteryPresent: {
     var device = UPower.displayDevice
     return !!(device && device.isPresent)
@@ -385,8 +397,8 @@ Panel {
   onBatteryPresentChanged: if (!batteryPresent) close()
 
   visible: batteryPresent
-  implicitWidth: batteryPresent ? button.implicitWidth : 0
-  implicitHeight: batteryPresent ? button.implicitHeight : 0
+  implicitWidth: batteryPresent ? buttonRow.implicitWidth : 0
+  implicitHeight: batteryPresent ? buttonRow.implicitHeight : 0
 
   Process {
     id: batteryProc
@@ -462,39 +474,50 @@ Panel {
     }
   }
 
-  BarIconButton {
-    id: button
+  // BarIconButton fits one glyph to Style.bar.iconSize and paints labelText at
+  // full size; a packed string in `text` would be scaled down to icon width.
+  // So one button per pack, each carrying its own icon and percentage. The
+  // vertical bar keeps the single aggregate readout.
+  Row {
+    id: buttonRow
     anchors.fill: parent
-    bar: root.bar
-    text: {
-      if (root.multiBattery && !vertical) {
-        var packs = root.batteries
-        var parts = []
-        for (var i = 0; i < packs.length; i++) {
-          var icon = root.deviceIcon(packs[i])
-          parts.push(root.showPercentage ? root.devicePercentage(packs[i]) + "% " + icon : icon)
-        }
-        return parts.join("  ")
+    spacing: 0
+
+    BarIconButton {
+      bar: root.bar
+      visible: root.vertical || !root.multiBattery
+      text: root.batteryIcon()
+      labelText: root.showPercentage && !root.vertical ? Math.round(root.batteryFraction * 100) + "%" : ""
+      slotSize: Style.bar.iconSlot * (root.showPercentage && !root.vertical ? 2 : 1)
+      tooltipText: ""
+      onPressed: function(b) {
+        if (!root.batteryPresent) return
+        if (b === Qt.RightButton) root.togglePercentage()
+        else root.toggle()
       }
-      return root.showPercentage && !vertical
-        ? Math.round(root.batteryFraction * 100) + "% " + root.batteryIcon()
-        : root.batteryIcon()
     }
-    slotSize: {
-      var packs = root.multiBattery && !vertical ? root.batteries.length : 1
-      return Style.bar.iconSlot * packs * (root.showPercentage && !vertical ? 2 : 1)
-    }
-    tooltipText: ""
-    onPressed: function(b) {
-      if (!root.batteryPresent) return
-      if (b === Qt.RightButton) root.togglePercentage()
-      else root.toggle()
+
+    Repeater {
+      model: !root.vertical && root.multiBattery ? root.batteries : []
+      delegate: BarIconButton {
+        required property var modelData
+        bar: root.bar
+        text: root.deviceIcon(modelData)
+        labelText: root.showPercentage ? root.devicePercentage(modelData) + "%" : ""
+        slotSize: Style.bar.iconSlot * (root.showPercentage ? 2 : 1)
+        tooltipText: ""
+        onPressed: function(b) {
+          if (!root.batteryPresent) return
+          if (b === Qt.RightButton) root.togglePercentage()
+          else root.toggle()
+        }
+      }
     }
   }
 
   KeyboardPanel {
     id: panel
-    anchorItem: button
+    anchorItem: buttonRow
     owner: root
     bar: root.bar
     open: root.opened && root.batteryPresent
